@@ -1,0 +1,79 @@
+import numpy as np 
+from numpy.fft import fft, fftfreq ,fftshift
+from scipy.interpolate import interp1d
+
+#------------ Spectral analysis---------------------------------
+
+def fast_f_t(x : np.ndarray,y:np.ndarray, M:int = 500):
+		t_interp = np.linspace(0, x[-1], M)  
+		dt = t_interp[1] - t_interp[0]
+		y = np.interp(t_interp,x, y )
+		y -= np.mean(y)
+		k = np.fft.fftfreq(M, d=dt)
+		yw = np.fft.fft(y)
+		return 2*np.pi*fftshift(k), fftshift(yw)
+
+
+def average_fft(x, y, Ms):
+	spectra = []
+	freqs_list = []
+
+	for M in Ms:
+		omega, A = fast_f_t(x, y, M)
+		freqs_list.append(omega)
+		spectra.append(A)
+
+	omega_min = max(freqs[0] for freqs in freqs_list)     # límite inferior común
+	omega_max = min(freqs[-1] for freqs in freqs_list)    # límite superior común
+	N_common = max(len(f) for f in freqs_list)            # densidad similar a la mayor
+	omega_common = np.linspace(omega_min, omega_max, N_common)
+
+
+	spectra_interp = []
+	for omega, A in zip(freqs_list, spectra):
+		f_interp = interp1d(omega, A, kind='linear', bounds_error=False, fill_value=0.0)
+		spectra_interp.append(f_interp(omega_common))
+
+	A_avg = np.mean(spectra_interp, axis=0)
+
+	return omega_common, A_avg
+
+def correlation(a_0,t,initial):
+	''' In a system with discrete spectrum, the spectral response id the fft of the correlations '''
+	
+	tau_values = np.linspace(0,t[-1],len(t)) #equal spacing, useful for fast fourier transform 
+	state = np.asarray(initial)
+
+	a_dag_0 = np.conjugate(np.transpose(a_0.reshape(-1,2,2),axes=(0,2,1))).reshape(-1,4) # need to transpose and conjugate first 
+	
+	interp_a_dag = interp1d(t,a_dag_0,axis=0, fill_value="extrapolate")
+	a_dag =interp_a_dag(tau_values).reshape(-1,2,2)
+	
+	interp_a = interp1d(t,a_0,axis=0, fill_value="extrapolate")
+	a_ttau =interp_a(t[-1]-tau_values).reshape(-1,2,2)
+
+	return tau_values,np.einsum('i,tik,tkj,j->t',np.conjugate(state),a_dag,a_ttau,state)
+
+# --------------------------- don't know how to call this , things That I will reuse and that makes sense to separate
+
+from joblib import Parallel, delayed 
+
+def paralelizar(parameter_list,f,ncores: int = 80):
+	resultados = Parallel(n_jobs=ncores, backend='loky')(
+		delayed(f)(param) for param in parameter_list
+	)
+	return resultados
+
+
+from logistics_DDE import new_cav_model
+
+def run_simulation(gamma,tau,phi,Omega,t_max,dt,initial,Ms = np.arange(5000,5200,1)):
+	cav = new_cav_model(gamma,phi,tau,Omega)
+	cav.evolve(t_max,dt)
+	t,e = cav.excited_state(np.asarray(initial))
+	tau_p,corr = correlation(cav.a_out_array,t,initial)
+	w1,S = average_fft(tau_p,corr,Ms)  # note: there might be an extra 2 factor somewhere 
+	w2,u = average_fft(t,cav.a_out_array[:,2],Ms)
+	return t,e, w1,S,w2,u
+
+# ---------------- exact single-mode with driving integrator ------------------- 

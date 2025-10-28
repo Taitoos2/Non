@@ -72,8 +72,25 @@ def run_simulation(gamma,tau,phi,Omega,t_max,dt,initial,Ms = np.arange(5000,5200
 	cav.evolve(t_max,dt)
 	t,e = cav.excited_state(np.asarray(initial))
 	tau_p,corr = correlation(cav.a_out_array,t,initial)
-	w1,S = average_fft(tau_p,corr,Ms)  # note: there might be an extra 2 factor somewhere 
-	w2,u = average_fft(t,cav.a_out_array[:,2],Ms)
-	return t,e, w1,S,w2,u
+	return t,e, cav.a_out_array,cav.s_array
 
-# ---------------- exact single-mode with driving integrator ------------------- 
+def observable(m,initial):
+	state=np.asarray(initial)
+	if m.shape[-1]==4:
+		m_2 = m.reshape(-1,2,2)
+		m_dag = np.conjugate(np.transpose(m_2,axes=(0,2,1)))
+		return np.real(np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m_2,state))
+	else:
+		m_dag = np.conjugate(np.transpose(m,axes=(0,2,1)))
+		return np.real(np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m,state))
+	
+def fft_matrix(t,a,Ms=np.arange(5000,5200,1)):
+    ''' enters as a (n,4), leaves as a (n,2,2)'''
+    a_w = []
+    w,a0 = average_fft(t,a[:,0],Ms)
+    a_w.append(a0)
+    for n in range(1,4):
+        _,a_dummie = average_fft(t,a[:,n],Ms)
+        a_w.append(a_dummie)
+    return w, (np.asarray(a_w).T).reshape(-1,2,2)
+

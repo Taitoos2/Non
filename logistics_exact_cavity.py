@@ -125,8 +125,11 @@ class two_modes_cavity:
 			psi_t = U @ self.psi0
 			vec.append(psi_t)
 		vec = np.array(vec)
+		b_tot=self.b1+self.b2
+		b_dag_tot=np.conjugate(np.transpose(b_tot))
 		pe = np.real(np.einsum('ti,ij,tj ->t ',np.conjugate(vec),self.sigma_plus@self.sigma_minus,vec))
 		exc1 =  np.real(np.einsum('ti,ij,tj ->t ',np.conjugate(vec),self.b1_dag@self.b1,vec))
 		exc2 =  np.real(np.einsum('ti,ij,tj ->t ',np.conjugate(vec),self.b2_dag@self.b2,vec))
-		return pe,exc1,exc2
+		exc_tot= np.real(np.einsum('ti,ij,tj ->t ',np.conjugate(vec),b_dag_tot@b_tot,vec))
+		return pe,exc1,exc2,exc_tot
 	

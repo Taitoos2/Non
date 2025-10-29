@@ -79,10 +79,10 @@ def observable(m,initial):
 	if m.shape[-1]==4:
 		m_2 = m.reshape(-1,2,2)
 		m_dag = np.conjugate(np.transpose(m_2,axes=(0,2,1)))
-		return np.real(np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m_2,state))
+		return np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m_2,state)
 	else:
 		m_dag = np.conjugate(np.transpose(m,axes=(0,2,1)))
-		return np.real(np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m,state))
+		return np.einsum('i,tik,tkj,j->t',np.conjugate(state),m_dag,m,state)
 	
 def fft_matrix(t,a,Ms=np.arange(5000,5200,1)):
     ''' enters as a (n,4), leaves as a (n,2,2)'''
